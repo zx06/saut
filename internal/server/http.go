@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/zx06/saut/internal/pkg/auth"
+
 	"github.com/gin-gonic/gin"
 	"github.com/zx06/saut/internal/handler"
 )
@@ -18,14 +20,33 @@ type HTTPServer struct {
 	server *http.Server
 }
 
-func registerRouters(srv *HTTPServer) {
+func registerRouters(srv *HTTPServer, auth *auth.Auth) {
 	engine := gin.New()
 	srv.server.Handler = engine
 	engine.Use(
 		gin.Logger(),
 		gin.Recovery(),
 	)
-	wsGroup := engine.Group("/ws")
+	authGroup := engine.Group("/auth")
+	{
+		authGroup.POST("/login", auth.LoginHandler())
+	}
+	assetsGroup := engine.Group("/assets", auth.AuthMiddleware())
+	{
+		assetsGroup.GET("/", func(c *gin.Context) {
+
+		})
+		assetsGroup.GET("/:id", func(c *gin.Context) {
+
+		})
+		assetsGroup.POST("/", func(c *gin.Context) {
+
+		})
+		assetsGroup.PUT("/:id", func(c *gin.Context) {
+
+		})
+	}
+	wsGroup := engine.Group("/ws", auth.AuthMiddleware())
 	{
 		wsGroup.GET("/terminal", handler.TerminalHandler)
 	}
@@ -41,7 +62,8 @@ func NewHTTPServer() *HTTPServer {
 
 func (srv *HTTPServer) Start() {
 	quit := make(chan os.Signal, 1)
-	registerRouters(srv)
+	auth := auth.NewAuth()
+	registerRouters(srv, auth)
 	go func() {
 		if err := srv.server.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
 			log.Printf("listen: %s\n", err)

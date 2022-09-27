@@ -5,11 +5,13 @@
 </template>
 
 <script lang="ts" setup>
-import {Terminal} from "xterm"
-import {FitAddon} from 'xterm-addon-fit'
-import {CanvasAddon} from 'xterm-addon-canvas';
-import "xterm/css/xterm.css"
-import {onMounted, onUnmounted, ref} from "vue";
+import debounce from "lodash.debounce";
+import { onMounted, onUnmounted, ref } from "vue";
+import { Terminal } from "xterm";
+import { CanvasAddon } from 'xterm-addon-canvas';
+import { FitAddon } from 'xterm-addon-fit';
+import { WebLinksAddon } from 'xterm-addon-web-links';
+import "xterm/css/xterm.css";
 
 const termRef = ref<HTMLElement>()
 let ws: WebSocket;
@@ -18,8 +20,8 @@ const term = new Terminal({
   fontFamily: '"Cascadia Mono", "Lucida Console", monospace, monaco, Consolas',
   fontSize: 12,
   lineHeight: 1,
-  rows: 50,
-  cols: 160,
+  // rows: 50,
+  // cols: 160,
   allowProposedApi: true,
 })
 const fitAddon = new FitAddon();
@@ -41,29 +43,37 @@ function sendInput(msg: string) {
   ws.send(JSON.stringify(data))
 }
 
-function sendResize(cols: number, rows: number) {
+function sendResize() {
   const data = {
     req_type: "TerminalResize",
     data: {
-      h: rows,
-      w: cols,
+      h: term.rows,
+      w: term.cols,
     }
   }
   ws.send(JSON.stringify(data))
 }
 
 function decodeMessage(data: string) {
-  return  JSON.parse(data)
+  return JSON.parse(data)
 }
 
 
 function initWS() {
   ws.onopen = (evt) => {
-    sendResize(term.cols, term.rows)
+    sendResize()
   }
   ws.onmessage = (evt) => {
     const resp = decodeMessage(evt.data)
     term.write(resp.data)
+  }
+
+  ws.onerror = (evt) => {
+    term.writeln("ws连接出错")
+  }
+
+  ws.onclose = (evt) => {
+    term.writeln("ws连接关闭")
   }
 
 }
@@ -76,6 +86,7 @@ function initTerminal() {
   }
   term.open(termRef.value);
   term.loadAddon(new CanvasAddon());
+  term.loadAddon(new WebLinksAddon())
   fitAddon.fit();
   term.focus();
   term.onData((data) => {
@@ -83,7 +94,7 @@ function initTerminal() {
   })
   addEventListener("resize", (evt) => {
     fitAddon.fit()
-    sendResize(term.cols, term.rows)
+    debounce(sendResize, 100)
   })
 }
 

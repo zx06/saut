@@ -42,7 +42,6 @@ func WSHandler(c *websocket.Conn, a assets_connector.AssetsConnector) {
 						cancel()
 						return
 					}
-					log.Println(n)
 					buf = buf[:n]
 					data, err := model.NewWsTerminalOutputResponse(string(buf))
 					if err != nil {
